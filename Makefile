@@ -1,11 +1,15 @@
 CXX=g++
 CXXFLAGS=-ggdb -Wall -Wextra -Ilib
-LDFLAGS=-L/usr/local/lib -L.
+
+OPTLIBS?=-L/usr/local/lib 
+PREFIX?=/usr/local
+
+LDFLAGS=$(OPTLIBS) -L.
+
 LIBS=-lm2pp -lzmq -ljson-c
 
-prefix=/usr/local
-incdir=$(prefix)/include
-libdir=$(prefix)/lib
+incdir=$(PREFIX)/include
+libdir=$(PREFIX)/lib
 
 AR=ar
 RANLIB=ranlib
