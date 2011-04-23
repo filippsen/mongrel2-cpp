@@ -1,5 +1,5 @@
 CXX?=g++
-OPTFLAGS=
+OPTFLAGS?=
 OPTLIBS?=-L/usr/local/lib 
 PREFIX?=/usr/local
 
