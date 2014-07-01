@@ -2,25 +2,103 @@
 #include <sstream>
 #include <zmq.hpp>
 #include <assert.h>
+#include <iostream>
 #include "m2pp.hpp"
 #include "m2pp_internal.hpp"
 
 namespace m2pp {
 
 connection::connection(const std::string& sender_id_, const std::string& sub_addr_, const std::string& pub_addr_) 
-    : ctx(1), sender_id(sender_id_), sub_addr(sub_addr_), pub_addr(pub_addr_), reqs(ctx, ZMQ_UPSTREAM), resp(ctx, ZMQ_PUB) {
-    reqs.connect(sub_addr.c_str());
-    resp.connect(pub_addr.c_str());
-    resp.setsockopt(ZMQ_IDENTITY, sender_id.data(), sender_id.length());
+    : sender_id(sender_id_), sub_addr(sub_addr_), pub_addr(pub_addr_) {
+
+    ctx = new zmq::context_t(1);
+
+    reqs = new zmq::socket_t(*ctx, ZMQ_PULL);
+    reqs->connect(sub_addr.c_str());
+
+    resp = new zmq::socket_t(*ctx, ZMQ_PUB);
+    resp->setsockopt(ZMQ_IDENTITY, sender_id.data(), sender_id.length());
+    resp->connect(pub_addr.c_str());
 }
 
 connection::~connection() {
+    if(reqs != NULL || resp != NULL)
+    {
+        std::cerr << "It's not cool to throw exceptions from destructors, so I'm not going to do that about the mongrel2-cpp ZeroMQ sockets that are not properly terminated and freed." << std::endl;
+    }
+    if(resp != NULL)
+    {
+        resp->close();
+        delete resp;
+    }
+    if(reqs != NULL)
+    {
+        reqs->close();
+        delete reqs;
+    }
+    if(ctx != NULL)
+    {
+        delete ctx;
+    }
 }
 
+/*
+ * Updated to recv within try block to enable termination on zmq.
+ * On termination the terminated flag is set to true on the retunred request object.
+ */
 request connection::recv() {
     zmq::message_t inmsg;
-    reqs.recv(&inmsg);
+    try
+    {
+        reqs->recv(&inmsg);
+    }
+    catch(const zmq::error_t& t)
+    {
+        /* context was deleted, so it is time to close socket and exit. */
+        reqs->close();
+        delete reqs;
+        reqs = NULL;
+        request req;
+        req.terminated = true;
+        return req;
+    }
     return request::parse(inmsg);
+}
+
+/**
+ * TERMINATE the sending part of zmq. Call this from your SEND thread.
+ *
+ * First signal your send thread to stop sending and then to run this function (exit_send())
+ * befire iit exits.
+ *
+ * OR if the sending is done from your main thread, then just call this directly from
+ * your main thread.
+ *
+ **/
+void connection::exit_send()
+{
+    resp->close();
+    delete resp;
+    resp = NULL;
+}
+
+/**
+ * TERMINATE the receiving part of zmq. Call this from your MAIN thread.
+ *
+ * Call this from your main thread to trigger the recv thread (running recv())
+ * interrupt its blocking and delete the recv socket.
+ *
+ * The flag terminated on the request object will be set after returning from recv()
+ *
+ **/
+void connection::exit_recv()
+{
+    /* Delete the context,
+     * this will trigger the thread running the recv function to
+     * close and delete the socket from that thread.
+     */
+    delete ctx;
+    ctx = NULL;
 }
 
 void connection::reply_http(const request& req, const std::string& response, uint16_t code, const std::string& status, std::vector<header> hdrs) {
@@ -43,7 +121,11 @@ void connection::reply(const request& req, const std::string& response) {
     std::string msg_str = msg.str();
     zmq::message_t outmsg(msg_str.length());
     ::memcpy(outmsg.data(), msg_str.data(), msg_str.length());
-    resp.send(outmsg);
+
+    if(resp != NULL)
+    {
+        resp->send(outmsg);
+    }
 }
 
 void connection::reply_websocket(const request& req, const std::string& response, char opcode, char rsvd) {
@@ -70,7 +152,11 @@ void connection::deliver(const std::string& uuid, const std::vector<std::string>
     std::string msg_str = msg.str();
     zmq::message_t outmsg(msg_str.length());
     ::memcpy(outmsg.data(), msg_str.data(), msg_str.length());
-    resp.send(outmsg);
+
+    if(resp != NULL)
+    {
+        resp->send(outmsg);
+    }
 }
 
 void connection::deliver_websocket(const std::string& uuid, const std::vector<std::string>& idents, const std::string& data, char opcode, char rsvd) {
@@ -104,7 +190,10 @@ request request::parse(zmq::message_t& msg) {
         }
     }
 
+    req.terminated = false;
+
     return req;
 }
 
 }
+

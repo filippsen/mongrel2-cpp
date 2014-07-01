@@ -20,6 +20,7 @@ struct request {
     std::vector<header> headers;
     std::string body;
     bool disconnect;
+    bool terminated;
     static request parse(zmq::message_t& msg);
 };
 
@@ -33,13 +34,15 @@ class connection {
         void reply_websocket(const request& req, const std::string& response, char opcode=1, char rsvd=0);
         void deliver(const std::string& uuid, const std::vector<std::string>& idents, const std::string& data);
         void deliver_websocket(const std::string& uuid, const std::vector<std::string>& idents, const std::string& data, char opcode=1, char rsvd=0);
+        void exit_send();
+        void exit_recv();
     private:
-        zmq::context_t ctx;
+        zmq::context_t *ctx;
         std::string sender_id;
         std::string sub_addr;
         std::string pub_addr;
-        zmq::socket_t reqs;
-        zmq::socket_t resp;
+        zmq::socket_t *reqs;
+        zmq::socket_t *resp;
 };
 
 }
