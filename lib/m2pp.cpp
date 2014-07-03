@@ -43,6 +43,8 @@ connection::~connection() {
  * On termination the terminated flag is set to true on the returned request object.
  */
 request connection::recv() {
+    assert(reqs != NULL);
+
     zmq::message_t inmsg;
     try
     {
@@ -73,6 +75,8 @@ request connection::recv() {
  **/
 void connection::exit_send()
 {
+    assert(resp != NULL);
+
     resp->close();
     delete resp;
     resp = NULL;
@@ -93,6 +97,8 @@ void connection::exit_recv()
      * this will trigger the thread running the recv function to
      * close and delete the socket from that thread.
      */
+    assert(ctx != NULL);
+
     delete ctx;
     ctx = NULL;
 }
