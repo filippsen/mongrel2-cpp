@@ -22,10 +22,6 @@ connection::connection(const std::string& sender_id_, const std::string& sub_add
 }
 
 connection::~connection() {
-    if(reqs != NULL || resp != NULL)
-    {
-        std::cerr << "It's not cool to throw exceptions from destructors, so I'm not going to do that about the mongrel2-cpp ZeroMQ sockets that are not properly terminated and freed." << std::endl;
-    }
     if(resp != NULL)
     {
         resp->close();
