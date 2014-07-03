@@ -40,7 +40,7 @@ connection::~connection() {
 
 /*
  * Updated to recv within try block to enable termination on zmq.
- * On termination the terminated flag is set to true on the retunred request object.
+ * On termination the terminated flag is set to true on the returned request object.
  */
 request connection::recv() {
     zmq::message_t inmsg;
