@@ -52,13 +52,23 @@ request connection::recv() {
     }
     catch(const zmq::error_t& t)
     {
-        /* context was deleted, so it is time to close socket and exit. */
-        reqs->close();
-        delete reqs;
-        reqs = NULL;
-        request req;
-        req.terminated = true;
-        return req;
+        if(t.num() == ETERM)
+        {
+            std::clog << "[mongrel2-cpp] ZMQ ETERM - Signaling program termination!\n";
+            
+            /* context was deleted, so it is time to close socket and exit. */
+            reqs->close();
+            delete reqs;
+            reqs = NULL;
+            request req;
+            req.terminated = true;
+            return req;
+        }
+        else
+        {
+            std::cerr << "[mongrel2-cpp] connection::recv exception. Msg: " << t.what() << std::endl;
+            throw;
+        }
     }
     return request::parse(inmsg);
 }
